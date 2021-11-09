@@ -1,0 +1,18 @@
+---
+- name: Quick-fix for Crowdstrike services
+  hosts: all
+  tasks:
+    - name: Check service for RHEL6
+      service:
+        name: falcon-sensor
+        state: started
+        enabled: yes
+      when: ansible_distribution == "RedHat" and ansible_distribution_major_version|int == 6
+
+    - name: Check service for RHEL7/8
+      systemd:
+        name: falcon-sensor
+        state: started
+        enabled: yes
+        masked: no
+      when: (ansible_distribution == "RedHat" or ansible_distribution == "CentOS" or ansible_distribution == 'OracleLinux') and ansible_distribution_major_version|int >= 7
