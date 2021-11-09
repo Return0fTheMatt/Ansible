@@ -1,0 +1,41 @@
+---
+- name: Set up a server to run sftp services through managed sshd
+  hosts: all
+  tasks:
+  - name: Ensure sftponly group exists
+    group:
+      name: sftponly
+      state: present
+
+  - name: Setting required SELinux boolians
+    shell: 'setsebool -P selinuxuser_use_ssh_chroot 1 ; setsebool -P ssh_chroot_rw_homedirs 1'
+
+  - name: Create sftp root folder
+    file:
+      name: /sftp
+      state: directory
+      owner: root
+      group: sftponly
+      mode: 0755
+
+  - name: Resetting sftp root folder SELinux context
+    shell: 'semanage fcontext -a -e /home /sftp ; restorecon -R /sftp'
+
+  - name: Insert/Update configuration block in /etc/ssh/sshd_config
+    blockinfile:
+      path: /etc/ssh/sshd_config
+      backup: yes
+      marker: "# {mark} Ansible-managed sftp configuration"
+      insertafter: EOF
+      block: |
+        Match Group sftponly
+                ChrootDirectory /sftp/%u
+                AllowTcpForwarding no
+                ForceCommand internal-sftp -d incoming
+                X11Forwarding no
+
+  - name: restart sshd to push config changes
+    systemd:
+      state: restarted
+      daemon_reload: yes
+      name: sshd
