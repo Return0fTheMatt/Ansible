@@ -1,0 +1,105 @@
+---
+- name: Playbook to migrate Satellite5 clients to Satellite 6
+  hosts: all
+  vars_files:
+    - vault.yml
+  tasks:
+  - name: Download bootstrap.py to /tmp
+    get_url:
+      url: https://up0011alli.genworth.net/pub/bootstrap.py
+      dest: /tmp
+      owner: root
+      group: root
+      mode: 0700
+      validate_certs: no
+
+  - name: Installing/Verifying Red Hat Insights package state
+    block:
+    - name: clearing any hung/old/broken transactions
+      command: /usr/sbin/yum-complete-transaction --cleanup-only --assumeyes
+      ignore_errors: true
+
+    - name: deleting /var/cache/yum
+      file:
+        path: /var/cache/yum
+        state: absent
+
+    - name: Installing/Updating/Verifying Insights package state
+      yum:
+        update_cache: yes
+        state: latest
+        name:
+          - insights-client
+
+  - name: Execute migration
+    shell: |
+        /tmp/bootstrap.py --login='migration' \
+        --password='{{ v_password }}' \
+        --server='up0011alli.genworth.net' \
+        --organization='{{ org|upper }}' \
+        --location='{{ location }}' \
+        --hostgroup='{{ hostgroup }}' \
+        --activationkey='{{ activationkey }}' \
+        --enablerepos='rhel-\*-satellite-tools-\*-rpms' \
+        --rex --rex-user='saconmgt' \
+        --install-katello-agent \
+        --unmanaged \
+        --skip='puppet' --skip='migration' \
+        --force
+
+  - name: Cleanup - Restart Services (RHELv7+)
+    systemd:
+      name: 'insights-client'
+      state: restarted
+      enabled: yes
+      masked: no
+      daemon-reload: yes
+    when: ansible_distribution_major_version|int >= 7
+
+  - name: Cleanup - Make sure insights-client is enabled (RHELv6)
+    block:
+      - name: Executing insights-client registration (RHELv6)
+        command: insights-client --register --silent
+
+      - name: Enabling insights-client cron (RHELv6)
+        command: insights-client --enable-schedule
+    when: ansible_distribution_major_version|int <= 6
+
+  - name: Cleanup - Removing bootstrap file
+    file:
+      path: /tmp/bootstrap.py
+      state: absent
+    ignore_errors: true
+
+  - name: Post Script - Update Configuration Environment on Satellite
+    command: "hammer host update --environment legacy --name {{ ansible_facts['fqdn'] }}"
+    delegate_to: up0011alli.genworth.net
+
+## Manual Commands for copy/paste if necessary:
+# ssh to server
+#
+# $ curl -k https://up0011alli.genworth.net/pub/bootstrap.py -o /tmp/bootstrap.py && sudo chmod +x /tmp/bootstrap.py
+#
+# $ sudo /tmp/bootstrap.py \
+#     --login='<YOUR SSO>' \
+#     --server='up0011alli.genworth.net' \
+#     --organization='USLI' \
+#     --location='Blythewood' \
+#     --hostgroup='GNW/USLI/BLY-DEV/RHELv7-VM' \
+#     --activationkey='USLIDC-DEV_VMs,USLIDC-DEV_Software' \
+#     --enablerepos='rhel-\*-satellite-tools-\*-rpms' \
+#     --rex --rex-user='saconmgt'\
+#     --install-katello-agent \
+#     --unmanaged \
+#     --skip='puppet' \
+#     --skip='migration' \
+#     --force
+#
+# $ rm /tmp/bootstrap.py
+#
+## RHELv6 only
+# $ sudo insights-client --register --silent && sudo insights-client --enable-schedule
+#
+## Do last
+# $ ssh up0011alli "sudo hammer host update --environment legacy --name <server fqdn>"
+#
