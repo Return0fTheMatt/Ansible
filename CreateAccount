@@ -1,0 +1,77 @@
+---
+- name: Create Collector Account
+  hosts: all
+  tasks:
+  - name: Adding required service account groups
+    group:
+     name: '{{ item.name }}'
+     gid: '{{ item.gid }}'
+     state: present
+    loop:
+     - { name: 'collector', gid: '5100' }
+
+  - name: Adding required service accounts
+    user:
+     name: '{{ item.name }}'
+     state: present
+     uid: '{{ item.uid }}'
+     group: '{{ item.group }}'
+     shell: /bin/bash
+     comment: "A#{{ item.sso }}"
+     home: "/local/home/{{ item.name }}"
+     password: "{{ item.password | password_hash('sha512', 65534 | random(seed=inventory_hostname) | string) }}"
+     update_password: on_create
+     ignore_errors: yes
+    loop:
+     - { name: 'collector', uid: '5100', group: 'ollector', sso: '123456789', password: '{{ collectorpass }}' }
+    notify:
+     - saccount_aging
+
+  - name: Configuring serivce account home directories
+    file:
+     path: '/home/{{ item.name }}'
+     owner: '{{ item.owner }}'
+     group: '{{ item.group }}'
+     mode: 0700
+     state: directory
+    loop:
+      - { name: 'collector', owner: '5100', group: '5100' }
+    notify:
+      - restorecon_home
+
+  - name: Ensuring service account home directories have an ssh folder
+    file:
+     path: '/local/home/{{ item.name }}/.ssh'
+     owner: '{{ item.owner }}'
+     group: '{{ item.group }}'
+     mode: 0700
+     state: directory
+    loop:
+     - { name: 'soxcollector', owner: '1161', group: '1161' }
+    notify:
+     - restorecon_home
+
+  - name: Creating any service account sub-folders
+    file:
+     path: '/local/home/{{ item.name }}/{{ item.folder }}'
+     owner: '{{ item.owner }}'
+     group: '{{ item.group }}'
+     mode: 0700
+     state: directory
+    loop:
+     - { name: 'soxcollector', folder: 'scripts', onwer: '1161', group: '1161' }
+    notify:
+     - restorecon_home
+
+  - name: Uploading service account files
+    copy:
+     src: '{{ item.src }}'
+     dest: '{{ item.dest }}'
+     owner: '{{ item.owner }}'
+     group: '{{ item.group }}'
+     mode: '{{ item.mode }}'
+    loop:
+     - { src: 'localhomecollector.sshauthorizedkeys', dest: '/home/collector/.ssh/authorized_keys', owner: '5100', group: '5100', mode: '0600' }
+     - { src: 'homecollectorscriptssudo_iiq', dest: '/home/collector/scripts/sudo_iiq', owner: '5100', group: '5100', mode: '0700' }
+    notify:
+     - restorecon_home
