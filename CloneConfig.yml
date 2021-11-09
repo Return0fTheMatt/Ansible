@@ -1,0 +1,57 @@
+---
+- name: Script for clone config
+  hosts: all
+  vars_prompt:
+  - name: username
+    prompt: Enter your SSO
+    private: no
+  - name: password
+    prompt: Enter your password
+    private: yes
+  - name: organization
+    prompt: Enter business org 
+    private: no
+  - name: location
+    prompt: Enter Datacenter location
+    private: no
+  - name: hostgroup
+    prompt: Enter Satellite hostgroup
+    private: no
+  - name: activationkey
+    prompt: Enter activation key
+    private: no
+  tasks:
+  - name: Set static hostname
+    shell: hostnamectl set-hostname --static {{inventory_hostname}}.genworth.net
+  - name: Set transient hostname
+    shell: hostnamectl set-hostname --transient {{inventory_hostname}}
+  - name: Run hostname module
+    hostname:
+      name: "{{ inventory_hostname }}"
+  - name: add Host line
+    lineinfile:
+     backup: yes
+     dest: /etc/hosts
+     insertbefore: BOF
+     line: "{{ ansible_default_ipv4.address }}        {{ inventory_hostname }}.genworth.net {{inventory_hostname}}"
+     state: present
+  - name: Join AD Realm
+    shell: |
+     yum -y install realmd oddjob oddjob-mkhomedir sssd samba-common-tools autofs
+     realm discover genworth.net
+     echo -n ***password*** | realm join g****.net -U '$DomainUser' --automatic-id-mapping=no
+     sed -i 's/use_fully_qualified_names.*/use_fully_qualified_names = False/' /etc/sssd/sssd.conf
+     sed -i 's/fallback_homedir.*/fallback_homedir = \/home\/\%u/' /etc/sssd/sssd.conf
+     echo "dyndns_update = False" >> /etc/sssd/sssd.conf
+     realm deny --all
+     realm permit -g U-`hostname -s`-NIX
+    become: yes
+  - name: Get bootstrap
+    get_url:
+      url: https://***HOSTNAME****.net/pub/bootstrap.py
+      dest: /tmp
+      mode: +x
+      validate_certs: no
+  - name: Run bootstrap
+    command: /tmp/bootstrap.py --login='{{ username }}' --password='{{ password }}' --server='FQDN.net' --organization='{{ organization }}' --location='{{ location }}' --hostgroup='{{ hostgroup }}' --activationkey='{{ activationkey }}' --enablerepos='rhel-\*-satellite-tools-\*-rpms' --rex --rex-user='adminuser' --install-katello-agent --unmanaged --skip='puppet' --force
+    become: yes
