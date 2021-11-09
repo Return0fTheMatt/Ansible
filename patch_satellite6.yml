@@ -1,0 +1,48 @@
+---
+- name: A playbook to update and patch Red Hat Satellite 6 servers to full and reboot
+  hosts: all
+  tasks:
+    - name: putting Satellite into maintenance mode
+      command: satellite-maintain maintenance-mode start
+
+    - name: unlocking satellite application packages
+      command: satellite-maintain packages unlock
+
+    - name: refreshing subscription with satellite/redhat mothership
+      command: subscription-manager refresh
+
+    - name: clearing any hung/old/broken transactions
+      command: yum-complete-transaction --cleanup-only --assumeyes
+      ignore_errors: true
+
+    - name: deleting /var/cache/yum
+      file:
+        path: /var/cache/yum
+        state: absent
+
+    - name: update yum packages only
+      yum:
+        update_cache: yes
+        name: 'yum*'
+        state: latest
+
+    - name: patching system to full
+      yum:
+        name: '*'
+        disable_excludes: all
+        state: latest
+
+    - name: locking satellite application packages
+      command: satellite-maintain packages lock
+
+    - name: Rebooting!
+      reboot:
+
+    - name: running satellite application upgrade
+      command: satellite-installer --scenario satellite --upgrade
+
+    - name: taking Satellite out of maintenance mode
+      command: satellite-maintain maintenance-mode stop
+
+    - name: restarting Satellite services for good measure
+      command: satellite-maintain service restart
