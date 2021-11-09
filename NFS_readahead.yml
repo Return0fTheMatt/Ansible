@@ -1,0 +1,18 @@
+---
+- name: Update Read-ahead value on NFS Mounts
+  hosts: all
+  handlers:
+  - name: restorecon_etc
+    command: restorecon -R /etc
+  tasks:
+  - name: Create file and insert content
+    lineinfile:
+      path: /etc/udev/rules.d/99-nfs.rules
+      create: yes
+      owner: root
+      group: root
+      mode: 0644
+      backup: yes
+      line: SUBSYSTEM=="bdi", ACTION=="add", PROGRAM="/bin/awk -v bdi=$kernel 'BEGIN{ret=1} {if ($4 == bdi) {ret=0}} END{exit ret}' /proc/fs/nfsfs/volumes", ATTR{read_ahead_kb}="1920"
+    notify:
+     - restorecon_etc
