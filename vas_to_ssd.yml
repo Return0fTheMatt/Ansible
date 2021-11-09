@@ -1,0 +1,106 @@
+---
+- name: Verifying all required variables were passed at execution (passed with the -e option on the command line)
+  fail:
+    msg: "Variable '{{ item }}' is not defined. Please re-run with the following: -e 's_env=[dev|stg|prod]'"
+  when: item not in vars
+  loop:
+    - s_env
+
+- name: This playbook is for RHEL7 systems, all other release versions will be ignored.
+  meta: end_host
+  when:
+    - ansible_distribution == "RedHat"
+    - ansible_distribution_major_version|int != 7
+
+- name: Gather service data
+  service_facts:
+
+- block:
+    - name: sssd found - making sure vas packages are removed
+      yum:
+        disable_excludes: all
+        state: removed
+        name:
+          - vasclnt
+          - vasgp
+
+    - name: sssd found - cleaning up leftover files/folders
+      file:
+        path: '{{ item.path }}'
+        state: absent
+      loop:
+        - { path: '/etc/opt/quest' }
+
+    - name: ... and skipping host since sssd is already installed.
+      meta: end_host
+
+  # End sssd found block
+  when: '"sssd.service" in ansible_facts.services'
+
+- block:
+    - name: vasd found - Install required packages for sssd on RHEL7
+      yum:
+        disable_excludes: all
+        state: present
+        name:
+          - adcli
+          - ntpdate
+          - ntp
+          - oddjob
+          - oddjob-mkhomedir
+          - openldap-clients
+          - realmd
+          - samba-common
+          - samba-common-tools
+          - sssd
+      notify:
+        - restart_realmd
+
+    - name: Discovering AD if enabled
+      command: realm discover {{ ad_server_domain }}
+
+    - name: Join {{ ansible_hostname }} to {{ ad_server_domain }}
+      command: /bin/bash -c "echo -n {{ ad_server_pass }} | realm join -v -U '{{ ad_server_user }}' {{ ad_server_domain }} --automatic-id-mapping=no && sleep 10"
+      register: ad_result
+      until: (ad_result is changed) or
+              (ad_result is succeeded)
+      retries: 3
+      no_log: true
+      notify:
+        - fix_pam
+        - restorecon_etc
+
+    - name: Configure SELinux to allow NFS home directories for SSO accounts
+      seboolean:
+        name: use_nfs_home_dirs
+        state: yes
+        persistent: yes
+
+    - name: Configue sssd.conf if AD auth enabled
+      template:
+        src: 'etcsssdsssd.conf.j2'
+        dest: '/etc/sssd/sssd.conf'
+        owner: root
+        group: root
+        mode: 0600
+      notify:
+        - restorecon_etc
+        - restart_sssd
+
+    - name: Removing vasd
+      yum:
+        disable_excludes: all
+        state: removed
+        name:
+          - vasclnt
+          - vasgp
+
+    - name: Clean up leftover files/folders
+      file:
+        path: '{{ item.path }}'
+        state: absent
+      loop:
+        - { path: '/etc/opt/quest' }
+
+  # End vasd found block
+  when: '"vasd.service" in ansible_facts.services'
