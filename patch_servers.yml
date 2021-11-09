@@ -1,0 +1,61 @@
+---
+- name: A playbook to patch servers to full and reboot
+  hosts: all
+  tasks:
+    - name: refreshing subscription with satellite
+      command: /usr/bin/subscription-manager refresh
+      ignore_errors: true
+
+    - name: RHEL7 only
+      block:
+        - name: clearing any hung/old/broken transactions
+          command: /usr/sbin/yum-complete-transaction --cleanup-only --assumeyes
+          ignore_errors: true
+
+        - name: clean up old kernels (legacy small /boot)
+          command: /usr/bin/package-cleanup --assumeyes --oldkernels --count=1
+          ignore_errors: true
+      when: ansible_distribution_major_version|int == 7
+
+    - name: Yum for RHEL7
+      block:
+        - name: deleting /var/cache/yum
+          file:
+            path: /var/cache/yum
+            state: absent
+
+        - name: update yum packages only
+          yum:
+            update_cache: yes
+            name: 'yum*'
+            state: latest
+
+        - name: patching system to full
+          yum:
+            name: '*'
+            disable_excludes: all
+            state: latest
+      when: ansible_distribution_major_version|int == 7
+
+    - name: DNF for RHEL8
+      block:
+        - name: deleting /var/cache/dnf
+          file:
+            path: /var/cache/dnf
+            state: absent
+
+        - name: update dnf packages only
+          dnf:
+            update_cache: yes
+            name: 'dnf*'
+            state: latest
+
+        - name: patching system to full
+          dnf:
+            name: '*'
+            disable_excludes: all
+            state: latest
+      when: ansible_distribution_major_version|int == 8
+
+    - name: Rebooting!
+      reboot:
