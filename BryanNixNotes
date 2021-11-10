@@ -1,0 +1,263 @@
+Good morning,
+
+Below is a list of some “brain dump” commands I’ve collected over the years that have proven useful to me. It’s by no means comprehensive, but I hope it provides a foundation upon which you can build. Please let me know if you have any questions. If the formatting is wonky in places, it was created in Notepad++. I copied it to word so I could password protect it before mailing it, as it does contain a couple of passwords. 
+
+All the best!
+
+Bryan 
+Autofs doesn’t work:
+Attempt to mount the auto-home volume manually to /mnt.
+
+If you receive an error regarding locking, try the following:
+mount -t nfs -o nolock server:/autohome_vol /mnt
+If that works, add the nolock option to /etc/auto.home and restart autofs service.
+
+RHEL7 autofs
+ restart rpcbind.socket, nfs-utils.service and autofs.service
+
+systemctl stop rpcbind.socket
+systemctl stop nfs-utils.service
+systemctl stop autofs.service
+
+systemctl start rpcbind.socket
+systemctl start nfs-utils.service
+systemctl start autofs.service
+
+
+RESTORE VM files
+Add new datastore - nfs
+Backup team will provide NFS filer and path to datastore.
+add datastore to the appropriate VM hosts.
+Mount datastore to one of our two utility servers (They have no DATA_dg on them)
+Use up0417alyn, up0158ably
+Each server has a 200gb /restore volume you can save your tarball or restored files to. 
+
+
+
+If you need to revert a VMWare Tools upgrade:
+to back out a hwcompat change, remove the server from inventory, browse to the VMX from ud0005ably/ud0210alyn and manually revert the version number.
+
+Relaunch VAS
+VAS Rebind:
+/opt/quest/bin/vastool -u '$gnwUSDataCentersvc@genworth.net' -w 'zp7wQOUTwx1eezXV2h1o' join -f -n $HOSTNAME GENWORTH.NET
+
+VAS DMZ ONLY Rebind
+/opt/quest/bin/vastool -u '$gnwUSDataCentersvc@dmz.genworth.net' -w 'zp7wQOUTwx1eezXV2h1o' join -f -n $HOSTNAME DMZ.GENWORTH.NET
+
+Restart VAS service (Solaris);
+saconmgt@as100aral (): /opt/quest ! $ sudo svcadm restart svc:/quest/vas/vasd:default
+
+
+ThinPool metadata at 100% capacity
+Issue
+How to extend the thin pool metadata lv which is exhausted?
+Resolution
+Metadata space exhaustion can lead to inconsistent thin pool metadata and inconsistent file systems, so the response requires offline checking and repair.
+
+Deactivate the thin LV and thinpool LV, or reboot the system if this is not possible.
+Repair thin pool with lvconvert --repair VG/ThinPoolLV.
+Extend pool metadata space with lvextend VG/ThinPoolLV_tmeta.
+Check and repair file system with fsck.
+https://access.redhat.com/solutions/2996701
+
+Build Complete
+
+Good afternoon,
+
+The server <hostname(s)> has completed the build process, passed QA, and is now available for your use. Passwords for accounts will be communicated separately. This has been documented in ServiceNow Request Item #: <RITM #>, which is now closed. Please feel free to contact me directly with any questions, concerns, issues, or comments pertaining to this specific ticket.
+
+CSIRT - Please add this server to your database.
+
+Thank you,
+
+<your sig>
+
+
+
+Find all files/directories and sort by modification date:
+
+find . -type d -printf "%T@ %Tc %p\n" | sort -n
+printf arguments from man find:
+
+%Tk: File's last modification time in the format specified by k.
+@: seconds since Jan. 1, 1970, 00:00 GMT, with fractional part.
+c: locale's date and time (Sat Nov 04 12:02:33 EST 1989).
+%p: File's name.
+
+
+
+
+To create a new [S]FTP user:
+
+FTP) Add user as normal; scp-only group; home dirs set up in /ftp/business/<user>
+    After user is created, set up proftpd.conf file as per standard procedure
+
+SFTP) Add user as normal; home dir /ftp/ssh/<username>
+    After user is created: 
+        - ln -s /ftp/ssh/<username> /home/<username>
+        - cd /ftp/ssh/<username>; mkdir home; cd home; ln -s .. <username>
+        - if a public key is provided:
+        - Add it to ~/.ssh/authorized_keys
+        - Execute the following: 
+            - ssh-keygen -e -f id_rsa.pub
+            - Add it to: ~/.sftp/authorized_keys
+            
+            
+
+delete solaris VM
+find physical host from zones spreadsheet
+ssh to physical host
+
+sudo zoneadm list -vi
+sudo zoneadm -z ral-prod02-dr halt
+sudo zoneadm -z ral-prod02-dr uninstall
+
+Missing zone
+sudo zoneadm list -cv
+if status of one or more zones is “installed” run
+sudo zoneadm -z zonename boot
+Satellite status
+rhn-satellite status
+
+restart search
+/usr/bin/rhnsearchd stop
+/usr/bin/rhnsearchd /usr/share/rhn/config-defaults/rhn_search_daemon.conf
+
+Insights failing
+
+du -x / --max-depth=2 | sort -n -r | more
+
+look for 
+core.*.dmp 
+heapdump.*.phd 
+javacore.*txt 
+Snap*.trc
+
+Restart satellite service
+
+
+Cyberark login script
+
+ssh 501285865@saconmgt@targethost.genworth.net@ap0938alyn -p 922
+#!/bin/bash
+read -p “Target Hostname: “ targethost
+/usr/bin/ssh ‘501285865@saconmgt@‘$targethost’.genworth.net@ap0938alyn -p 922’
+
+
+
+Samba example
+\\genworth.net\gnwapps\HQ\Actuarial\ACTCGAAP	/ACTCGAAP	cifs	user,uid=498,rw,suid,credentials=/etc/samba/.RITM0086430,_netdev 0 0
+
+USERID=$ActITAdminJenkSvc
+PASSWD=H2Jt@z5-S_G7qr3@X-bT0j9_Dp
+DOMAIN=genworth.net
+
+Replicon / projecttimecapture issues - 
+Randstad help desk # 866-435-7456
+
+
+Background process
+Assuming that you have a program running in the foreground, press ctrl-Z, then:
+
+[1]+  Stopped                 myprogram
+$ disown -h %1
+$ bg 1
+[1]+ myprogram &
+$ logout
+
+If there is only one job, then you don't need to specify the job number. Just use disown -h and bg.
+
+
+Password generator
+head -n 500 /dev/urandom | tr -dc '[a-z][A-Z][0-9]' | fold -w 16 | head -n 1
+Creates a random 8-digit password. Can be shortened or lengthened by changing the -w variable.
+
+
+
+
+#!/bin/bash
+read -p "Length?  " -e LN
+read -p "Account name?  " -e ACCT
+PASS=`head -n 500 /dev/urandom | tr -dc '[:alnum:][:xdigit:][!@%^&+?=-_.]' | fold -w $LN | head -n 1`; echo $PASS
+echo $PASS | sudo passwd $ACCT --stdin
+
+
+
+Delete all lines containing a text string in a file:
+sed -i '/atextstring/d’ anyfile.txt
+(used successfully to remove user from /etc/auto.home)
+
+find files older than x days:
+find ./file/path -name "*" -type f -mtime +X -exec ls -la {} \;
+
+find files newer than x days 
+find ./file/path -name "*" -type f -mtime -X -exec ls -la {} \;
+
+X11 - sshd Failed to allocate internet-domain X11 display socket error
+add AddressFamily inet 
+to /etc/opt/quest/ssh/sshd_config
+restart sshd-quest
+log out
+log in with -X flag
+test xclock
+
+Sendmail issue - 
+
+vi /etc/postfix/main.cf
+change inet_protocols = all to inet_protocols = ipv4
+run postfix start 
+
+SMB mount
+add to /etc/fstab
+
+\\winbox\getme /mnt/win cifs 	user,uid=500,rw,noauto,suid,credentials=/etc/<RITM#>.txt 0 0
+create text file with credentials, set permissions for root only read.
+chmod 400 /etc/<RITM#>.txt; chown root:root /etc/<RITM#>.txt
+
+
+
+
+CISCO UCS VM
+
+Due to the new changes to Java Security and patching the below changes will need to be made.
+1.       If you are connecting to UCS with a newer Java and getting permissions issues follow the below procedures to remediate them on your profile. (Bleebbly or your local machine)
+a.       Start -> All Programs -> Java -> Configure Java
+b.      Select the Security Tab
+c.       Change the Security Level to Medium.
+d.      Click Ok and Affirm any command prompts.
+2.       If you attempting to KVM to a UCS server and the IP address is blank.
+a.       Use the attached spreadsheet to locate the IP address of the MgmtIP.
+b.      We will be putting in DNS entries for each server so going forward you should be able to use <servername>-ilo.genworth.net
+
+c.       Once all UCS domains are upgraded to 2.2 you will be able to use https://<servername>-ilo.genworth.net/ to connect the KVM of the server.
+If you have any questions please respond to this email. 
+
+
+smo IP find
+
+#!/bin/bash
+# Find IP of multiple hosts
+export smoip=`df -h | grep jf | awk '{print $1}'| sed 's/ *:.*//' | sort -u`
+
+for i in `echo $smoip`; do host -t a $i | awk '{print $4}'; done
+
+
+
+ESX console reset
+
+Solaris - disk full
+
+Global zone - Remove all but most recent files in /var/core.
+
+
+Processes by CPU
+
+ps aux --sort -rss
+
+
+
+
+
+Chown only files owned by specific user
+chown -R --from='CURRENT_OWNER' 'NEW_OWNER' /whatever
+chown -R --from=someuser:somegroup newuser:newgroup /whatever
