@@ -1,0 +1,5 @@
+---
+- name: Migrate VAS to SSSD
+  hosts: all
+  roles:
+    - vas-to-sssd
