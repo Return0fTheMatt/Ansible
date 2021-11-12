@@ -1,0 +1,24 @@
+##main handlers file for vas-to-sssd
+---
+- name: fix_pam
+  lineinfile:
+    path: /etc/pam.d/system-auth
+    backup: yes
+    insertafter: '.*pam_pwquality.so*'
+    line: 'password    requisite                                    pam_pwhistory.so remember=12 use_authtok'
+
+- name: restorecon_etc
+  command: /usr/sbin/restorecon -R /etc
+  ignore_errors: yes
+
+- name: restart_realmd
+  service:
+    name: realmd
+    state: restarted
+    daemon-reload: yes
+
+- name: restart_sssd
+  service:
+    name: sssd
+    state: restarted
+    daemon-reload: yes
