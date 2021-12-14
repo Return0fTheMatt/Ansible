@@ -1,0 +1,30 @@
+---
+- name: OS Clone Configuration
+  hosts: all
+  vars_files:
+  - vars/main.yml
+  vars_prompt:
+  - name: username
+    prompt: Enter your SSO
+    private: no
+  - name: password
+    prompt: Enter your password
+    private: yes
+  - name: organization
+    prompt: Enter business org [USMI|USLI]
+    private: no
+  - name: location
+    prompt: Enter Datacenter location [Blythewood|Lynchburg]
+    private: no
+  - name: hostgroup
+    prompt: Enter Satellite hostgroup
+    private: no
+  - name: activationkey
+    prompt: Enter activation key
+    private: no
+  - name: puppet_env
+    prompt: Enter puppet environment of source VM
+    private: no
+
+  roles:
+    - CloneConfig
