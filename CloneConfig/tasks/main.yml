@@ -1,0 +1,137 @@
+---
+- name: Set static hostname
+  shell: hostnamectl set-hostname --static {{inventory_hostname}}.genworth.net
+
+- name: Set transient hostname
+  shell: hostnamectl set-hostname --transient {{inventory_hostname}}
+
+- name: Run hostname module
+  hostname:
+    name: "{{ inventory_hostname }}"
+
+- name: add Host line
+  lineinfile:
+   backup: yes
+   dest: /etc/hosts
+   insertbefore: BOF
+   line: "{{ ansible_default_ipv4.address }}        {{ inventory_hostname }}.genworth.net {{inventory_hostname}}"
+   state: present
+
+- name: Leave AD Realm on RHEL7/8 systems
+  command: realm leave --remove
+  become: yes
+  ignore_errors: true
+
+- name: Removing VAS packages
+  yum:
+   disable_excludes: all
+   state: removed
+   name:
+    - vasclnt
+    - vasgp
+
+- name: Install sssd packages
+  yum:
+   name:
+    - realmd
+    - oddjob
+    - oddjob-mkhomedir
+    - sssd
+    - samba-common-tools
+    - autofs
+   state: present
+
+- name: Join AD Realm
+  shell: |
+   realm discover genworth.net
+   echo -n {{ ad_server_pass }} | realm join genworth.net -U '$gnwDCDomain' --automatic-id-mapping=no
+   sed -i 's/use_fully_qualified_names.*/use_fully_qualified_names = False/' /etc/sssd/sssd.conf
+   sed -i 's/fallback_homedir.*/fallback_homedir = \/home\/\%u/' /etc/sssd/sssd.conf
+   echo "dyndns_update = False" >> /etc/sssd/sssd.conf
+   realm deny --all
+   realm permit -g U-`hostname -s`-NIX
+   systemctl restart sssd.service
+  become: yes
+
+- name: Get bootstrap
+  get_url:
+    url: https://up0011alli.genworth.net/pub/bootstrap.py
+    dest: /tmp
+    mode: +x
+    validate_certs: no
+
+- name: Run bootstrap
+  command: /tmp/bootstrap.py --login='{{ username }}' --password='{{ password }}' --server='up0011alli.genworth.net' --organization='{{ organization }}' --location='{{ location }}' --hostgroup='{{ hostgroup }}' --activationkey='{{ activationkey }}' --enablerepos='rhel-\*-satellite-tools-\*-rpms' --rex --rex-user='saconmgt' --install-katello-agent --unmanaged --skip='puppet' --force
+  become: yes
+
+- name: Update Configuration Environment on Satellite
+  command: "hammer host update --environment {{ puppet_env }} --name {{ inventory_hostname }}.genworth.net"
+  delegate_to: up0011alli.genworth.net
+
+- name: Fix Insights Client
+  yum:
+   name: insights-client
+   state: latest
+
+- name: Register With Insights
+  command: insights-client --register --silent
+
+- name: Removing current client install
+  yum:
+    name: 'falcon-sensor*'
+    state: absent
+
+- name: Download RHEL7 client RPM to /tmp
+  get_url:
+    url: https://up0011alli.genworth.net/pub/software/falcon-sensor-5.38.0-10402.el7.x86_64.rpm
+    dest: /tmp
+    owner: root
+    group: root
+    mode: 0700
+    validate_certs: no
+  when: ansible_distribution == "RedHat" and
+        ansible_distribution_major_version|int == 7
+
+- name: Installing RHELv7 client
+  yum:
+    disable_gpg_check: yes
+    state: present
+    name: /tmp/falcon-sensor-5.38.0-10402.el7.x86_64.rpm
+  when: ansible_distribution == "RedHat" and
+        ansible_distribution_major_version|int == 7
+
+- name: Download RHEL8 client RPM to /tmp
+  get_url:
+    url: https://up0011alli.genworth.net/pub/software/falcon-sensor-5.38.0-10402.el8.x86_64.rpm
+    dest: /tmp
+    owner: root
+    group: root
+    mode: 0700
+    validate_certs: no
+  when: ansible_distribution == "RedHat" and
+        ansible_distribution_major_version|int == 8
+
+- name: Installing RHELv8 client
+  yum:
+    disable_gpg_check: yes
+    state: present
+    name: /tmp/falcon-sensor-5.38.0-10402.el8.x86_64.rpm
+  when: ansible_distribution == "RedHat" and
+        ansible_distribution_major_version|int == 8
+
+- name: Activate client
+  command: /opt/CrowdStrike/falconctl -s -f --cid="510419A8DDEE4C7D90AD9FE472548C35-0F" --tags="env_DEVELOPMENT"
+
+- name: Enable service
+  systemd:
+    name: 'falcon-sensor'
+    daemon_reload: yes
+    state: restarted
+    enabled: yes
+    masked: no
+
+- name: Delete client RPM from /tmp
+  file:
+    path: /tmp/falcon-sensor-5.38.0-10402.el{{ ansible_distribution_major_version}}.x86_64.rpm
+    state: absent
+
