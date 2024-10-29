@@ -1,6 +1,6 @@
 ---
 - name: Set static hostname
-  shell: hostnamectl set-hostname --static {{inventory_hostname}}.genworth.net
+  shell: hostnamectl set-hostname --static {{inventory_hostname}}.domain.net
 
 - name: Set transient hostname
   shell: hostnamectl set-hostname --transient {{inventory_hostname}}
@@ -14,7 +14,7 @@
    backup: yes
    dest: /etc/hosts
    insertbefore: BOF
-   line: "{{ ansible_default_ipv4.address }}        {{ inventory_hostname }}.genworth.net {{inventory_hostname}}"
+   line: "{{ ansible_default_ipv4.address }}        {{ inventory_hostname }}.domain.net {{inventory_hostname}}"
    state: present
 
 - name: Leave AD Realm on RHEL7/8 systems
@@ -44,7 +44,7 @@
 - name: Join AD Realm
   shell: |
    realm discover genworth.net
-   echo -n {{ ad_server_pass }} | realm join genworth.net -U '$gnwDCDomain' --automatic-id-mapping=no
+   echo -n {{ ad_server_pass }} | realm join domain.net -U '$DCDomain' --automatic-id-mapping=no
    sed -i 's/use_fully_qualified_names.*/use_fully_qualified_names = False/' /etc/sssd/sssd.conf
    sed -i 's/fallback_homedir.*/fallback_homedir = \/home\/\%u/' /etc/sssd/sssd.conf
    echo "dyndns_update = False" >> /etc/sssd/sssd.conf
@@ -55,18 +55,18 @@
 
 - name: Get bootstrap
   get_url:
-    url: https://up0011alli.genworth.net/pub/bootstrap.py
+    url: https://hostname.domain.net/pub/bootstrap.py
     dest: /tmp
     mode: +x
     validate_certs: no
 
 - name: Run bootstrap
-  command: /tmp/bootstrap.py --login='{{ username }}' --password='{{ password }}' --server='up0011alli.genworth.net' --organization='{{ organization }}' --location='{{ location }}' --hostgroup='{{ hostgroup }}' --activationkey='{{ activationkey }}' --enablerepos='rhel-\*-satellite-tools-\*-rpms' --rex --rex-user='saconmgt' --install-katello-agent --unmanaged --skip='puppet' --force
+  command: /tmp/bootstrap.py --login='{{ username }}' --password='{{ password }}' --server='hostname.domain.net' --organization='{{ organization }}' --location='{{ location }}' --hostgroup='{{ hostgroup }}' --activationkey='{{ activationkey }}' --enablerepos='rhel-\*-satellite-tools-\*-rpms' --rex --rex-user='saconmgt' --install-katello-agent --unmanaged --skip='puppet' --force
   become: yes
 
 - name: Update Configuration Environment on Satellite
-  command: "hammer host update --environment {{ puppet_env }} --name {{ inventory_hostname }}.genworth.net"
-  delegate_to: up0011alli.genworth.net
+  command: "hammer host update --environment {{ puppet_env }} --name {{ inventory_hostname }}.domain.net"
+  delegate_to: hostname.domain.net
 
 - name: Fix Insights Client
   yum:
@@ -83,7 +83,7 @@
 
 - name: Download RHEL7 client RPM to /tmp
   get_url:
-    url: https://up0011alli.genworth.net/pub/software/falcon-sensor-5.38.0-10402.el7.x86_64.rpm
+    url: https://hostname.domain.net/pub/software/falcon-sensor-5.38.0-10402.el7.x86_64.rpm
     dest: /tmp
     owner: root
     group: root
@@ -102,7 +102,7 @@
 
 - name: Download RHEL8 client RPM to /tmp
   get_url:
-    url: https://up0011alli.genworth.net/pub/software/falcon-sensor-5.38.0-10402.el8.x86_64.rpm
+    url: https://hostname.domain.net/pub/software/falcon-sensor-5.38.0-10402.el8.x86_64.rpm
     dest: /tmp
     owner: root
     group: root
