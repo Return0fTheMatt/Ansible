@@ -1,0 +1,54 @@
+---
+- name: Reboot host with mainetnance window
+  hosts: all
+  gather_facts: false
+  tasks:
+    - name: Linux Block
+      vars:
+        ansible_connection: ssh
+        ansible_port: 22
+      tags: linux
+      block:
+        - name: Gather Linux facts
+          ansible.builtin.setup:
+
+        - name: Linux - Putting server into a 1-hour Zenoss Maintenance Window to cover reboots
+          when: tower_user_id is defined
+          ansible.builtin.command:
+            cmd: >-
+              /apps/zenoss/AddMaintWin.py {{ host_name }} --dHours {{ durationHours }}
+              --SSO AAPTaskID_{{ tower_job_id }}.AAPUser_{{ tower_user_name }}
+          register: maintwinout
+          changed_when: '"window created" is in maintwinout.stdout'
+
+        - name: Reboot Linux machine
+          ansible.builtin.reboot:
+            msg: Reboot initiated by {{ tower_user_name }} using Ansible Task {{ tower_job_id }}
+            reboot_timeout: 3600
+          become: true
+
+    # END Linux block
+
+    - name: Windows Block
+      vars:
+        ansible_connection: winrm
+        ansible_port: 5985
+        ansible_winrm_transport: ntlm
+        ansible_winrm_server_cert_validation: ignore
+      tags: windows
+      block:
+        - name: Gather Windows facts
+          ansible.builtin.setup:
+
+        - name: Windows - Putting server into a 1-hour Zenoss Maintenance Window to cover reboots - AAP Executed
+          ansible.windows.win_command: >-
+            py.exe D:\apps\zenoss\AddMaintWin.py {{ ansible_hostname }} --dHours 1
+            --SSO AAPTaskID_{{ tower_job_id }}.AAPUser_{{ tower_user_name }}
+          delegate_to: host.domain.net ##Windows utility box
+
+        - name: Reboot Windows machine
+          ansible.windows.win_reboot:
+            msg: Reboot initiated by {{ tower_user_name }} using Ansible Task {{ tower_job_id }}
+            reboot_timeout: 3600
+
+    # END Windows block
