@@ -30,6 +30,6 @@ UNLICENSED - ALL RIGHTS RESERVED(c)
 
 Author Information
 ------------------
-
+Designed for individual configuration of Linux VM clones.
 By Matthew G Smith (502004368 - matthew.smith1@genworth.com) for Genworth Financial
 
