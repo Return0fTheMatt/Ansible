@@ -1,3 +1,4 @@
+##Designed for use with Ansible Automation Platform
 ---
 - name: Reboot host with mainetnance window
   hosts: all
