@@ -11,10 +11,10 @@
     prompt: Enter your password
     private: yes
   - name: organization
-    prompt: Enter business org [USMI|USLI]
+    prompt: Enter business org 
     private: no
   - name: location
-    prompt: Enter Datacenter location [Blythewood|Lynchburg]
+    prompt: Enter Datacenter location 
     private: no
   - name: hostgroup
     prompt: Enter Satellite hostgroup
