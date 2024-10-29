@@ -6,7 +6,7 @@
   tasks:
   - name: Download bootstrap.py to /tmp
     get_url:
-      url: https://up0011alli.genworth.net/pub/bootstrap.py
+      url: https://hostname.net/pub/bootstrap.py
       dest: /tmp
       owner: root
       group: root
@@ -35,7 +35,7 @@
     shell: |
         /tmp/bootstrap.py --login='migration' \
         --password='{{ v_password }}' \
-        --server='up0011alli.genworth.net' \
+        --server='hostname.net' \
         --organization='{{ org|upper }}' \
         --location='{{ location }}' \
         --hostgroup='{{ hostgroup }}' \
@@ -73,7 +73,7 @@
 
   - name: Post Script - Update Configuration Environment on Satellite
     command: "hammer host update --environment legacy --name {{ ansible_facts['fqdn'] }}"
-    delegate_to: up0011alli.genworth.net
+    delegate_to: hostname.net
 
 ## Manual Commands for copy/paste if necessary:
 # ssh to server
@@ -82,11 +82,11 @@
 #
 # $ sudo /tmp/bootstrap.py \
 #     --login='<YOUR SSO>' \
-#     --server='up0011alli.genworth.net' \
+#     --server='hostname.net' \
 #     --organization='USLI' \
 #     --location='Blythewood' \
-#     --hostgroup='GNW/USLI/BLY-DEV/RHELv7-VM' \
-#     --activationkey='USLIDC-DEV_VMs,USLIDC-DEV_Software' \
+#     --hostgroup='/ORG/BUS/DC/RHELv7-VM' \
+#     --activationkey='' \
 #     --enablerepos='rhel-\*-satellite-tools-\*-rpms' \
 #     --rex --rex-user='saconmgt'\
 #     --install-katello-agent \
@@ -101,5 +101,5 @@
 # $ sudo insights-client --register --silent && sudo insights-client --enable-schedule
 #
 ## Do last
-# $ ssh up0011alli "sudo hammer host update --environment legacy --name <server fqdn>"
+# $ ssh hostname "sudo hammer host update --environment legacy --name <server fqdn>"
 #
